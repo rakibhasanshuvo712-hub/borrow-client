@@ -1,0 +1,60 @@
+@import "tailwindcss";
+:root{
+  --ink:#0f172a;
+  --muted:#64748b;
+  --primary:#6366f1;
+  --lav:#8b5cf6;
+  --pink:#ec4899;
+  --orange:#f97316;
+  --amber:#f59e0b;
+  --green:#10b981;
+  --cyan:#06b6d4;
+  --blue:#3b82f6;
+  --soft:#f8fafc;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:#fff;color:var(--ink);font-family:var(--font-inter),sans-serif}
+h1,h2,h3,h4{font-family:var(--font-poppins),sans-serif}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit}
+.container{width:min(1160px,calc(100% - 40px));margin-inline:auto}
+
+/* Super colorful gradients */
+.gradient{background:linear-gradient(120deg,#6366f1,#8b5cf6,#ec4899,#f97316)}
+.gradient-text{background:linear-gradient(110deg,#6366f1,#8b5cf6,#ec4899,#f97316);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+.gradient-hero{background:linear-gradient(125deg,#6366f1 0%,#8b5cf6 35%,#ec4899 65%,#f97316 100%);background-size:220% 220%;animation:shift 9s ease infinite}
+@keyframes shift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.rainbow-border{position:relative;background:#fff;border-radius:24px}
+.rainbow-border::before{content:"";position:absolute;inset:-2px;border-radius:26px;background:linear-gradient(120deg,#6366f1,#8b5cf6,#ec4899,#f97316,#f59e0b,#10b981,#06b6d4);background-size:300% 300%;animation:shift 7s ease infinite;z-index:-1}
+
+.glass{background:#ffffffd9;backdrop-filter:blur(16px)}
+
+.card{border:1px solid #e8eaf2;border-radius:24px;background:white;box-shadow:0 14px 40px #1e293b0a;transition:transform .2s,box-shadow .2s}
+.card:hover{transform:translateY(-4px);box-shadow:0 20px 48px #1e293b14}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border-radius:14px;padding:13px 19px;font-weight:700;transition:transform .18s,opacity .18s,box-shadow .18s}
+.btn:hover{transform:translateY(-1px)}
+.btn-primary{color:white;background:linear-gradient(110deg,#6366f1,#8b5cf6,#ec4899);background-size:180% 180%;box-shadow:0 9px 24px #6d63ed38;animation:shift 6s ease infinite}
+.btn-primary:hover{box-shadow:0 12px 30px #ec489940}
+.btn-secondary{color:#6d28d9;background:linear-gradient(110deg,#eef2ff,#fae8ff,#fef3c7);border:1px solid #e9d5ff}
+.btn-success{color:white;background:linear-gradient(110deg,#10b981,#06b6d4);box-shadow:0 9px 24px #10b98138}
+.btn-warm{color:white;background:linear-gradient(110deg,#f97316,#ec4899);box-shadow:0 9px 24px #f9731638}
+
+.section{padding:76px 0}
+.eyebrow{background:linear-gradient(110deg,#6366f1,#8b5cf6,#ec4899);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+
+.reveal{animation:rise .55s both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.float{animation:float 6s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+/* Badge chips */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:700}
+.chip-pink{background:#fce7f3;color:#be185d}
+.chip-purple{background:#ede9fe;color:#6d28d9}
+.chip-cyan{background:#cffafe;color:#0e7490}
+.chip-amber{background:#fef3c7;color:#b45309}
+.chip-green{background:#d1fae5;color:#047857}
+
+@media(max-width:650px){.container{width:min(100% - 28px,1160px)}.section{padding:52px 0}}

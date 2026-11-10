@@ -1,0 +1,3 @@
+import { NextResponse, type NextRequest } from "next/server";
+export function proxy(request: NextRequest){const protectedRoute=request.nextUrl.pathname.startsWith("/dashboard")||request.nextUrl.pathname==="/messages"||request.nextUrl.pathname==="/favorites";const hasSession=request.cookies.get("better-auth.session_token")||request.cookies.get("__Secure-better-auth.session_token");if(protectedRoute&&!hasSession){const url=new URL("/login",request.url);url.searchParams.set("next",request.nextUrl.pathname);return NextResponse.redirect(url)}return NextResponse.next()}
+export const config={matcher:["/dashboard/:path*","/messages","/favorites"]};
