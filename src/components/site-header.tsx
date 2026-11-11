@@ -2,8 +2,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Heart, LogOut, Menu, MessageCircle, Plus, User, X } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Heart, LogOut, Menu, MessageCircle, Package, Plus, User, X } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
@@ -14,17 +14,23 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
   const router = useRouter();
-  const { data: session } = authClient.useSession();
+  const queryClient = useQueryClient();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
   const { data: me } = useQuery({
     queryKey: ["me"],
     queryFn: () => api<Me>("/me"),
     enabled: Boolean(session),
     retry: false,
   });
-  const name = me?.name || session?.user?.name || "";
+  // The profile query is cached, so after logging out we must ignore it —
+  // otherwise the header keeps showing the previous account's name.
+  const signedIn = Boolean(session);
+  const name = signedIn ? me?.name || session?.user?.name || "" : "";
   const initial = name ? name[0].toUpperCase() : "U";
   const dashboardHref = me?.role === "admin" ? "/dashboard/admin" : me?.role === "owner" ? "/dashboard/owner" : "/dashboard/renter";
-  const canList = me?.canList === true || me?.role === "owner" || me?.role === "admin";
+  // Only owners/admins (and "do both" accounts) get the Add listing button —
+  // renters never see it.
+  const canList = signedIn && (me?.canList === true || me?.role === "owner" || me?.role === "admin");
 
   return (
     <header className="glass" style={{ position: "sticky", top: 0, zIndex: 30, borderBottom: "1px solid #eef0f5" }}>
@@ -42,7 +48,9 @@ export function SiteHeader() {
           {canList && <Link href="/dashboard/owner/listings/new" className="btn btn-warm nav-add"><Plus size={17} /> Add listing</Link>}
           <Link aria-label="Favorites" href="/favorites" className="icon-link"><Heart size={19} /></Link>
           <Link aria-label="Messages" href="/messages" className="icon-link"><MessageCircle size={19} /></Link>
-          {name ? (
+          {sessionPending ? (
+            <span className="avatar" aria-hidden="true" style={{ opacity: 0.4 }} />
+          ) : name ? (
             <div style={{ position: "relative" }}>
               <button aria-label="Profile" className="profile-btn" onClick={() => setMenu(!menu)}>
                 <span className="avatar">{initial}</span>
@@ -56,12 +64,16 @@ export function SiteHeader() {
                   </div>
                   <Link href={dashboardHref} onClick={() => setMenu(false)}><User size={16} /> My dashboard</Link>
                   {canList && <Link href="/dashboard/owner/listings/new" onClick={() => setMenu(false)}><Plus size={16} /> Add a listing</Link>}
+                  {canList && <Link href="/dashboard/owner/listings" onClick={() => setMenu(false)}><Package size={16} /> My listings</Link>}
                   <Link href="/dashboard/renter" onClick={() => setMenu(false)}><Heart size={16} /> My bookings</Link>
                   <button onClick={async () => {
                     try {
                       const result = await authClient.signOut();
                       if (result.error) throw new Error(result.error.message || "Could not log out");
                       setMenu(false);
+                      // Drop the cached profile so the header resets immediately.
+                      queryClient.removeQueries({ queryKey: ["me"] });
+                      // Logging out always lands back on the homepage.
                       router.push("/");
                       router.refresh();
                     } catch (error) {
@@ -87,7 +99,7 @@ export function SiteHeader() {
           <Link href="/how-it-works">How it works</Link>
           <Link href="/about">About</Link>
           {canList && <Link href="/dashboard/owner/listings/new"><Plus size={16} /> Add a listing</Link>}
-          {!name && <Link href="/register">Sign up</Link>}
+          {!sessionPending && !name && <Link href="/register">Sign up</Link>}
         </nav>
       )}
       <style jsx>{`

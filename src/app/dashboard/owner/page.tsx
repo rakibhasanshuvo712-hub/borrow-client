@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ArrowRight, Plus, Wallet } from "lucide-react";
+import { ArrowRight, Package, Plus, Wallet } from "lucide-react";
 import { api, money, type Item } from "@/lib/api";
 
 type OwnerDashboardData = {
@@ -15,7 +15,7 @@ type OwnerDashboardData = {
 export default function OwnerDashboard() {
   const { data, isLoading, error } = useQuery({ queryKey: ["dashboard", "owner"], queryFn: () => api<OwnerDashboardData>("/dashboard/owner") });
   return <><main className="container" style={{ padding: "44px 0 80px" }}>
-    <div className="dashboard-head"><div><div className="eyebrow">OWNER SPACE</div><h1 style={{ fontSize: 38, margin: "7px 0" }}>Your rental business</h1><p style={{ color: "#64748b", margin: 0 }}>Keep listings moving and make every idle item count.</p></div><div className="head-actions"><Link className="btn" style={{ background: "#f1efff", color: "#5e56d2" }} href="/dashboard/owner/requests">Booking requests <ArrowRight size={16}/></Link><Link className="btn btn-primary" href="/dashboard/owner/listings/new"><Plus size={17}/> Add a listing</Link></div></div>
+    <div className="dashboard-head"><div><div className="eyebrow">OWNER SPACE</div><h1 style={{ fontSize: 38, margin: "7px 0" }}>Your rental business</h1><p style={{ color: "#64748b", margin: 0 }}>Keep listings moving and make every idle item count.</p></div><div className="head-actions"><Link className="btn" style={{ background: "#f1efff", color: "#5e56d2" }} href="/dashboard/owner/requests">Booking requests <ArrowRight size={16}/></Link><Link className="btn" style={{ background: "#fff", border: "1px solid #e3e6ef" }} href="/dashboard/owner/listings"><Package size={16}/> My listings</Link><Link className="btn btn-primary" href="/dashboard/owner/listings/new"><Plus size={17}/> Add a listing</Link></div></div>
     {isLoading ? <div className="stats">{[1,2,3,4].map(x=><div className="card loading" key={x}/>)}</div> : error ? <div className="card empty" role="alert">Couldn’t load your owner overview. Check that your account can list items.</div> : data ? <>
       <div className="stats">{[["Total earnings",money(data.totalEarnings)],["This month",money(data.thisMonth)],["Active rentals",String(data.activeRentals)],["Live listings",String(data.listings)]].map(([label,value])=><article className="card metric" key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
       <div className="content-grid"><section className="card chart-card"><div className="card-heading"><div><h2>Rental revenue</h2><p>Monthly rental totals</p></div><Wallet color="#7166e8"/></div>{data.monthlyRevenue?.length?<div style={{ height: 275 }}><ResponsiveContainer width="100%" height="100%"><BarChart data={data.monthlyRevenue}><CartesianGrid stroke="#eef0f6" vertical={false}/><XAxis dataKey="month" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false}/><Tooltip formatter={(value)=>money(Number(value))}/><Bar dataKey="revenue" fill="#7166e8" radius={[8,8,0,0]}/></BarChart></ResponsiveContainer></div>:<div className="empty chart-empty">Your revenue chart will fill in as rentals are completed.</div>}</section>

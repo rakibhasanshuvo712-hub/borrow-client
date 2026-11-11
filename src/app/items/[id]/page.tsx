@@ -2,11 +2,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { use, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { addDays, format } from "date-fns";
-import { CalendarDays, MapPin, ShieldCheck, Star } from "lucide-react";
+import { CalendarDays, MapPin, Package, Phone, ShieldCheck, Star } from "lucide-react";
 import { toast } from "sonner";
 import { FavoriteToggle } from "@/components/favorite-toggle";
+import { authClient } from "@/lib/auth-client";
 import { api, isImageSrc, money, type Item } from "@/lib/api";
 
 export default function ItemPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +16,8 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [booked, setBooked] = useState(false);
+  const router = useRouter();
+  const { data: session } = authClient.useSession();
 
   const { data: item, isLoading, error } = useQuery({
     queryKey: ["item", resolved],
@@ -31,6 +35,9 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
     onSuccess: () => { setBooked(true); toast.success("Booking request sent — view it in My bookings"); },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // Guests can browse, but renting needs an account.
+  const requireLogin = () => router.push(`/login?next=${encodeURIComponent(`/items/${resolved}`)}`);
 
   if (isLoading || !item) return <main className="container" style={{ padding: 80, textAlign: "center" }}>{error ? "Item not found" : "Loading item details…"}</main>;
   const photos = (item.images ?? []).filter(isImageSrc);
@@ -51,9 +58,10 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
               <h1 style={{ fontSize: 36, marginBottom: 8 }}>{item.name}</h1>
               <FavoriteToggle item={item} />
             </div>
-            <div style={{ display: "flex", gap: 14, color: "#64748b", fontSize: 14 }}>
+            <div style={{ display: "flex", gap: 14, color: "#64748b", fontSize: 14, flexWrap: "wrap" }}>
               <span><MapPin size={15} style={{ verticalAlign: "middle" }} /> {item.location?.area || item.location?.city || "Bangladesh"}</span>
               <span><Star size={15} fill="#f59e0b" color="#f59e0b" style={{ verticalAlign: "middle" }} /> {item.avgRating?.toFixed(1) || "New"} ({item.reviewCount || 0} reviews)</span>
+              <span><Package size={15} style={{ verticalAlign: "middle" }} /> {item.quantity ?? 1} available</span>
             </div>
             <p style={{ lineHeight: 1.8, color: "#475569", marginTop: 25 }}>{item.description}</p>
             <div className="owner">
@@ -63,6 +71,15 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
                 <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>{item.owner?.isVerified && <><ShieldCheck size={14} color="#6366f1" /> Verified owner</>}</div>
               </div>
             </div>
+            {(item.phone || item.owner?.phone) && (
+              <a className="contact-row" href={`tel:${item.phone || item.owner?.phone}`}>
+                <span className="contact-icon"><Phone size={17} /></span>
+                <span>
+                  <small>Contact the owner</small>
+                  <b>{item.phone || item.owner?.phone}</b>
+                </span>
+              </a>
+            )}
           </div>
 
           <aside className="booking card">
@@ -71,6 +88,7 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
               <span style={{ color: "#b45309", fontSize: 13 }}>★ {item.avgRating?.toFixed(1) || "New"}</span>
             </div>
             <div className="price-rows"><span>Weekly</span><b>{money(item.pricing.weekly)}</b><span>Monthly</span><b>{money(item.pricing.monthly)}</b></div>
+            <div className="stock-row"><Package size={15} color="#6366f1" /><span><b>{item.quantity ?? 1}</b> unit{(item.quantity ?? 1) > 1 ? "s" : ""} available</span></div>
 
             {booked ? (
               <div className="booked-success">
@@ -86,14 +104,14 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
                 <label className="date">Start date<input type="date" min={format(new Date(), "yyyy-MM-dd")} value={start} onChange={e => { setStart(e.target.value); if (end && e.target.value > end) setEnd(""); quote.reset(); }} /></label>
                 <label className="date">End date<input type="date" min={start || format(addDays(new Date(), 1), "yyyy-MM-dd")} value={end} onChange={e => { setEnd(e.target.value); quote.reset(); }} /></label>
                 {invalidRange ? <p style={{ color: "#b91c1c", fontSize: 13 }}>The end date must be after the start date.</p> : unavailableRange ? <p style={{ color: "#b91c1c", fontSize: 13 }}>Unavailable dates selected. Pick a range outside the booked dates.</p> : null}
-                <button className="btn btn-secondary" style={{ width: "100%", marginTop: 15 }} disabled={!start || !end || invalidRange || unavailableRange || quote.isPending} onClick={() => quote.mutate()}>Get rental quote</button>
+                <button className="btn btn-secondary" style={{ width: "100%", marginTop: 15 }} disabled={session ? (!start || !end || invalidRange || unavailableRange || quote.isPending) : false} onClick={() => (session ? quote.mutate() : requireLogin())}>{session ? "Get rental quote" : "Log in to rent"}</button>
                 {quote.data && (
                   <div className="quote">
                     <div><span>Rental ({quote.data.days} days)</span><b>{money(quote.data.pricing.rentalTotal)}</b></div>
                     <div><span>Service fee</span><b>{money(quote.data.pricing.serviceFee)}</b></div>
                     <div><span>Refundable deposit</span><b>{money(quote.data.pricing.deposit)}</b></div>
                     <div className="total"><span>Total</span><b>{money(quote.data.pricing.grandTotal)}</b></div>
-                    <button className="btn btn-primary book-now" style={{ width: "100%", marginTop: 12 }} disabled={request.isPending} onClick={() => request.mutate()}>
+                    <button className="btn btn-primary book-now" style={{ width: "100%", marginTop: 12 }} disabled={request.isPending} onClick={() => (session ? request.mutate() : requireLogin())}>
                       {request.isPending ? "Booking…" : "Book now"}
                     </button>
                   </div>
@@ -113,6 +131,12 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
         .booking{padding:22px;position:sticky;top:95px}
         .price-rows{display:grid;grid-template-columns:1fr auto;gap:10px;padding:16px 0;border-block:1px solid #edf0f4;margin:16px 0;color:#64748b;font-size:13px}
         .price-rows b{color:#0f172a}
+        .stock-row{display:flex;align-items:center;gap:8px;font-size:13px;color:#475569;padding-bottom:14px;border-bottom:1px solid #edf0f4;margin-bottom:4px}
+        .contact-row{display:flex;align-items:center;gap:12px;margin-top:16px;padding:14px;border:1px solid #e9ebf1;border-radius:16px;background:linear-gradient(110deg,#eef2ff,#fae8ff);color:#4c1d95;text-decoration:none}
+        .contact-row:hover{box-shadow:0 8px 22px #8b5cf626}
+        .contact-row small{display:block;font-size:11px;color:#7c74c9;text-transform:uppercase;letter-spacing:.06em}
+        .contact-row b{font-size:16px}
+        .contact-icon{width:38px;height:38px;border-radius:12px;background:#fff;display:grid;place-items:center;color:#6366f1;flex:none}
         .date{display:block;font-size:12px;color:#64748b;margin:10px 0}
         .date input{display:block;width:100%;padding:10px;margin-top:5px;border:1px solid #e5e7ef;border-radius:10px}
         .quote{margin-top:18px;padding-top:12px;border-top:1px solid #edf0f4}

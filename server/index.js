@@ -86,7 +86,17 @@ const auth = betterAuth({
   database: mongodbAdapter(authDb),
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.FRONTEND_URL],
+  trustedOrigins: [
+    env.FRONTEND_URL,
+    'https://borrowhub-client.vercel.app',
+    'https://borrowhub-server.vercel.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+  ].filter(Boolean),
   emailAndPassword: { enabled: true },
   user: {
     additionalFields: {
@@ -123,7 +133,7 @@ const auth = betterAuth({
   advanced: {
     useSecureCookies: env.NODE_ENV === 'production',
     defaultCookieAttributes: {
-      sameSite: env.COOKIE_SAME_SITE,
+      sameSite: env.NODE_ENV === 'production' ? 'none' : env.COOKIE_SAME_SITE,
       secure: env.NODE_ENV === 'production',
       httpOnly: true,
     },
@@ -181,6 +191,10 @@ const itemSchema = new Schema(
     brand: String,
     model: String,
     description: { type: String, required: true },
+    // Contact number shown on the listing so renters can reach the owner.
+    phone: { type: String, trim: true, default: '' },
+    // How many units of this item are available to rent right now.
+    quantity: { type: Number, required: true, min: 1, default: 1 },
     includes: [String],
     images: [String],
     condition: { type: String, enum: ['New', 'Like New', 'Excellent', 'Good', 'Fair'], required: true },
@@ -389,8 +403,37 @@ const priceForDays = (days, pricing) => {
 // ─── Express app ────────────────────────────────────────────────────────────────
 const app = express();
 
-app.use(helmet());
-app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: false,
+    contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
+  }),
+);
+
+const allowedOrigins = [
+  env.FRONTEND_URL,
+  'https://borrowhub-client.vercel.app',
+  'https://borrowhub-server.vercel.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  }),
+);
 app.use(compression());
 app.use(morgan('combined'));
 
@@ -469,6 +512,8 @@ const itemInput = z.object({
   brand: z.string().max(80).optional(),
   model: z.string().max(80).optional(),
   description: z.string().min(10).max(5000),
+  phone: z.string().trim().min(5).max(20).default(''),
+  quantity: z.number().int().min(1).max(10000).default(1),
   includes: z.array(z.string()).max(30).default([]),
   images: z.array(z.string().url()).max(8).default([]),
   condition: z.enum(['New', 'Like New', 'Excellent', 'Good', 'Fair']),
@@ -534,6 +579,17 @@ app.get('/api/items/featured', wrap(async (req, res) => {
   send(res, items, 'Featured items');
 }));
 
+// READ – the current user's own listings (all statuses)
+app.get('/api/items/mine', requireAuth, wrap(async (req, res) => {
+  const { page, limit, skip } = pageOf(req);
+  const filter = { owner: req.user.id };
+  const [items, total] = await Promise.all([
+    Item.find(filter).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+    Item.countDocuments(filter),
+  ]);
+  send(res, items, 'My listings', 200, { page, limit, total, pages: Math.ceil(total / limit) });
+}));
+
 // READ – get single item with owner info & booked dates
 app.get('/api/items/:id', wrap(async (req, res) => {
   const item = await Item.findById(id(req.params.id)).lean();
@@ -543,7 +599,10 @@ app.get('/api/items/:id', wrap(async (req, res) => {
     authMongoClient
       .db()
       .collection('user')
-      .findOne({ _id: toMongoId(item.owner) }, { projection: { name: 1, image: 1, location: 1, bio: 1, trustScore: 1, isVerified: 1 } }),
+      .findOne(
+        { _id: toMongoId(item.owner) },
+        { projection: { name: 1, image: 1, location: 1, bio: 1, phone: 1, trustScore: 1, isVerified: 1 } },
+      ),
     Booking.find({ item: item._id, status: { $in: activeStatuses } }, { startDate: 1, endDate: 1 }).lean(),
   ]);
 
@@ -581,6 +640,11 @@ app.get('/api/items/:id/reviews', wrap(async (req, res) => {
 
 // CREATE – create a new item listing
 app.post('/api/items', requireAuth, writeLimiter, wrap(async (req, res) => {
+  // Renters never get a "canList" flag, so they cannot create listings even if
+  // they bypass the UI (owners and admins always can).
+  if (req.user.canList === false && req.user.role !== 'admin')
+    throw new AppError(403, 'Your account is set up to rent, not to list items');
+
   const data = itemInput.parse(req.body);
   // Listings publish immediately so they appear on the homepage right away.
   // Admins can still moderate with PATCH /api/admin/items/:id (approved/rejected/paused).
@@ -595,8 +659,11 @@ app.patch('/api/items/:id', requireAuth, writeLimiter, wrap(async (req, res) => 
   if (item.owner !== req.user.id && req.user.role !== 'admin') throw new AppError(403, 'Not your listing');
 
   const data = itemInput.partial().parse(req.body);
-  Object.assign(item, data);
-  item.status = 'pending';
+  // Skip undefined keys so a partially-filled form never wipes existing values.
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) item.set(key, value);
+  }
+  // Editing keeps the listing live: moderation status is only changed by admins.
   await item.save();
   send(res, item);
 }));
@@ -607,7 +674,15 @@ app.delete('/api/items/:id', requireAuth, writeLimiter, wrap(async (req, res) =>
   if (!item) throw new AppError(404, 'Item not found');
   if (item.owner !== req.user.id && req.user.role !== 'admin') throw new AppError(403, 'Not your listing');
 
-  await item.deleteOne();
+  // Never yank an item out from under an ongoing rental.
+  const activeBooking = await Booking.exists({ item: item._id, status: { $in: activeStatuses } });
+  if (activeBooking) throw new AppError(409, 'This item has active rentals and cannot be deleted yet');
+
+  await Promise.all([
+    item.deleteOne(),
+    Favorite.deleteMany({ item: item._id }),
+    Review.deleteMany({ item: item._id }),
+  ]);
   send(res, { deleted: true });
 }));
 
@@ -1165,7 +1240,12 @@ app.use(errorHandler);
 
 // ─── HTTP + Socket.io server ────────────────────────────────────────────────────
 const httpServer = createServer(app);
-const io = new SocketServer(httpServer, { cors: { origin: env.FRONTEND_URL, credentials: true } });
+const io = new SocketServer(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
+});
 
 io.use(async (socket, next) => {
   try {

@@ -1,14 +1,15 @@
 "use client";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, type Category } from "@/lib/api";
 
 export default function NewListing() {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: () => api<Category[]>("/categories") });
   const create = useMutation({
     mutationFn: (body: object) => api("/items", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: () => {
@@ -35,6 +36,8 @@ export default function NewListing() {
             name: f.get("name"), category: f.get("category"), brand: f.get("brand"),
             description: f.get("description"), includes: [], images: image ? [image] : [],
             condition: f.get("condition"),
+            phone: String(f.get("phone") ?? "").trim(),
+            quantity: num("quantity") || 1,
             pricing: { daily: num("daily"), weekly: num("weekly"), monthly: num("monthly") },
             deposit: num("deposit"),
             location: { area: f.get("area"), city: f.get("city"), coordinates: { type: "Point", coordinates: [0, 0] } },
@@ -47,23 +50,36 @@ export default function NewListing() {
             ["category", "Category", true],
             ["brand", "Brand (optional)", false],
             ["image", "Photo URL (optional)", false],
+            ["phone", "Contact phone", true],
+            ["quantity", "Units available", true],
             ["daily", "Daily price ৳", true],
             ["weekly", "Weekly price ৳", true],
             ["monthly", "Monthly price ৳", true],
             ["deposit", "Refundable deposit ৳", true],
             ["area", "Area", true],
             ["city", "City", true],
-          ] as [string, string, boolean][]).map(([name, label, required]) => (
-            <label key={name} style={{ fontSize: 13, fontWeight: 600 }}>{label}
-              <input
-                required={required}
-                name={name}
-                type={["daily", "weekly", "monthly", "deposit"].includes(name) ? "number" : name === "image" ? "url" : "text"}
-                min={name === "deposit" ? 0 : 1}
-                className="input"
-              />
-            </label>
-          ))}
+          ] as [string, string, boolean][]).map(([name, label, required]) =>
+            name === "category" ? (
+              <label key={name} style={{ fontSize: 13, fontWeight: 600 }}>{label}
+                <select name="category" className="input" defaultValue="" required>
+                  <option value="" disabled>Choose a category</option>
+                  {(categories ?? []).map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+                </select>
+              </label>
+            ) : (
+              <label key={name} style={{ fontSize: 13, fontWeight: 600 }}>{label}
+                <input
+                  required={required}
+                  name={name}
+                  type={["daily", "weekly", "monthly", "deposit", "quantity"].includes(name) ? "number" : name === "image" ? "url" : name === "phone" ? "tel" : "text"}
+                  min={name === "deposit" ? 0 : 1}
+                  defaultValue={name === "quantity" ? 1 : undefined}
+                  placeholder={name === "phone" ? "01XXXXXXXXX" : undefined}
+                  className="input"
+                />
+              </label>
+            )
+          )}
           <label>Condition
             <select name="condition" className="input">
               <option>Like New</option><option>New</option><option>Excellent</option><option>Good</option><option>Fair</option>

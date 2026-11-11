@@ -10,7 +10,9 @@ type CurrentUser = { id: string; name?: string; role: "renter" | "owner" | "admi
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
-  const { data: session } = authClient.useSession();
+  // isPending stays true until better-auth has actually resolved the session,
+  // so a refresh of a dashboard URL never gets mistaken for "logged out".
+  const { data: session, isPending: sessionPending } = authClient.useSession();
   const { data: user, isLoading, isError } = useQuery({
     queryKey: ["me"],
     queryFn: () => api<CurrentUser>("/me"),
@@ -19,18 +21,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    if (isLoading) return;
+    if (sessionPending || isLoading) return;
+    if (!session) {
+      router.replace(`/login?next=${encodeURIComponent(path)}`);
+      return;
+    }
     if (!user) {
-      if (isError || (!session && !isLoading)) router.replace(`/login?next=${encodeURIComponent(path)}`);
+      if (isError) router.replace(`/login?next=${encodeURIComponent(path)}`);
       return;
     }
     const allowed = path.includes("/admin") ? user.role === "admin" : path.includes("/owner") ? user.role === "owner" || user.role === "admin" || user.canList === true : user.canRent !== false;
     if (!allowed) {
       router.replace(user.role === "admin" ? "/dashboard/admin" : user.canList ? "/dashboard/owner" : "/dashboard/renter");
     }
-  }, [isError, isLoading, path, router, user, session]);
+  }, [isError, isLoading, path, router, user, session, sessionPending]);
 
-  if (isLoading || !user) return <main style={{ minHeight: "70vh", display: "grid", placeItems: "center", color: "#64748b" }}>{isError ? "Taking you to sign in…" : "Loading your account…"}</main>;
+  if (sessionPending || isLoading || !user)
+    return (
+      <main style={{ minHeight: "70vh", display: "grid", placeItems: "center", color: "#64748b" }}>
+        {isError || (!session && !sessionPending) ? "Taking you to sign in…" : "Loading your account…"}
+      </main>
+    );
 
   const name = user.name || session?.user?.name || "there";
   const initial = name[0]?.toUpperCase() || "U";
