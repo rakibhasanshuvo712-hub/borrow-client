@@ -33,19 +33,34 @@ export default function NewListing() {
           e.preventDefault();
           setBusy(true);
           const f = new FormData(e.currentTarget);
-          const num = (key: string) => Number(f.get(key));
+          const num = (key: string) => {
+            const v = Number(f.get(key));
+            return isNaN(v) ? 0 : v;
+          };
           const rawImage = String(f.get("image") ?? "").trim();
           const category = String(f.get("category") ?? "");
           const finalImage = rawImage || CATEGORY_FALLBACK_IMAGES[category] || DEFAULT_FALLBACK_IMAGE;
+          const daily = num("daily");
+          const weekly = num("weekly") || (daily ? daily * 6 : 0);
+          const monthly = num("monthly") || (daily ? daily * 25 : 0);
+          const brandVal = String(f.get("brand") ?? "").trim();
           const body = {
-            name: f.get("name"), category, brand: f.get("brand"),
-            description: f.get("description"), includes: [], images: [finalImage],
+            name: String(f.get("name") ?? "").trim(),
+            category,
+            brand: brandVal || undefined,
+            description: String(f.get("description") ?? "").trim(),
+            includes: [],
+            images: [finalImage],
             condition: f.get("condition"),
             phone: String(f.get("phone") ?? "").trim(),
             quantity: num("quantity") || 1,
-            pricing: { daily: num("daily"), weekly: num("weekly"), monthly: num("monthly") },
+            pricing: { daily: daily || 1, weekly: weekly || 6, monthly: monthly || 25 },
             deposit: num("deposit"),
-            location: { area: f.get("area"), city: f.get("city"), coordinates: { type: "Point", coordinates: [0, 0] } },
+            location: {
+              area: String(f.get("area") ?? "").trim(),
+              city: String(f.get("city") ?? "").trim(),
+              coordinates: { type: "Point", coordinates: [0, 0] },
+            },
             pickupOption: "both",
           };
           try { await create.mutateAsync(body); } finally { setBusy(false); }

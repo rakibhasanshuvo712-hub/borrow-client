@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, LogOut, Menu, MessageCircle, Package, Plus, User, X } from "lucide-react";
+import { Heart, LogOut, Menu, MessageCircle, Package, Plus, ShieldAlert, User, X } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { api } from "@/lib/api";
@@ -43,6 +43,9 @@ export function SiteHeader() {
           <Link href="/categories">Categories</Link>
           <Link href="/how-it-works">How it works</Link>
           <Link href="/about">About</Link>
+          <Link href="/disputes" style={{ color: "#e11d48", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <ShieldAlert size={15} /> Solve Dispute
+          </Link>
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {canList && <Link href="/dashboard/owner/listings/new" className="btn btn-warm nav-add"><Plus size={17} /> Add listing</Link>}
@@ -63,6 +66,7 @@ export function SiteHeader() {
                     <div><b>{name}</b><small>{me?.role}</small></div>
                   </div>
                   <Link href={dashboardHref} onClick={() => setMenu(false)}><User size={16} /> My dashboard</Link>
+                  <Link href="/disputes" onClick={() => setMenu(false)}><ShieldAlert size={16} /> Solve Dispute</Link>
                   {canList && <Link href="/dashboard/owner/listings/new" onClick={() => setMenu(false)}><Plus size={16} /> Add a listing</Link>}
                   {canList && <Link href="/dashboard/owner/listings" onClick={() => setMenu(false)}><Package size={16} /> My listings</Link>}
                   <Link href="/dashboard/renter" onClick={() => setMenu(false)}><Heart size={16} /> My bookings</Link>
@@ -98,6 +102,7 @@ export function SiteHeader() {
           <Link href="/categories">Categories</Link>
           <Link href="/how-it-works">How it works</Link>
           <Link href="/about">About</Link>
+          <Link href="/disputes" onClick={() => setOpen(false)} style={{ color: "#e11d48", fontWeight: 700 }}>Solve Dispute</Link>
           {canList && <Link href="/dashboard/owner/listings/new"><Plus size={16} /> Add a listing</Link>}
           {!sessionPending && !name && <Link href="/register">Sign up</Link>}
         </nav>
