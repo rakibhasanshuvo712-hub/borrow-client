@@ -2,15 +2,34 @@ export class ApiError extends Error { constructor(message: string, readonly stat
 export type Envelope<T> = { success: boolean; data: T; message: string; meta?: { page?: number; limit?: number; total?: number; pages?: number } };
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "");
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  let response: Response;
+  let response: Response | undefined;
+  const targetUrl = `${API_BASE_URL}/api${path}`;
   try {
-    response = await fetch(`${API_BASE_URL}/api${path}`, { ...init, credentials: "include", headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), ...init.headers } });
+    response = await fetch(targetUrl, {
+      ...init,
+      credentials: "include",
+      headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), ...init.headers },
+    });
   } catch {
-    throw new ApiError(`Cannot reach the BorrowHub API at ${API_BASE_URL}. Make sure the server is running.`, 0);
+    // If running in browser and cross-origin fetch failed, try same-origin proxy fallback
+    if (typeof window !== "undefined" && !targetUrl.startsWith(window.location.origin)) {
+      try {
+        response = await fetch(`/api${path}`, {
+          ...init,
+          credentials: "include",
+          headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), ...init.headers },
+        });
+      } catch {
+        // Fall through
+      }
+    }
+    if (!response) {
+      throw new ApiError(`Cannot reach the BorrowHub API at ${API_BASE_URL}. Make sure the server is running.`, 0);
+    }
   }
   const text = await response.text();
   let result: Envelope<T> | undefined;
-  try { result = text ? JSON.parse(text) as Envelope<T> : undefined; } catch { result = undefined; }
+  try { result = text ? (JSON.parse(text) as Envelope<T>) : undefined; } catch { result = undefined; }
   if (!response.ok || !result?.success) throw new ApiError(result?.message || `Request failed (${response.status})`, response.status);
   return result.data;
 }
