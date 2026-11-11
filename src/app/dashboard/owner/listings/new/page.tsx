@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api, type Category } from "@/lib/api";
+import { CATEGORY_FALLBACK_IMAGES, DEFAULT_FALLBACK_IMAGE } from "@/lib/images";
 
 export default function NewListing() {
   const [busy, setBusy] = useState(false);
@@ -12,10 +13,12 @@ export default function NewListing() {
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: () => api<Category[]>("/categories") });
   const create = useMutation({
     mutationFn: (body: object) => api("/items", { method: "POST", body: JSON.stringify(body) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["items"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["items"] });
+      await queryClient.refetchQueries({ queryKey: ["items"] });
       toast.success("Listing published — view it on the homepage");
       router.push("/");
+      router.refresh();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -31,10 +34,12 @@ export default function NewListing() {
           setBusy(true);
           const f = new FormData(e.currentTarget);
           const num = (key: string) => Number(f.get(key));
-          const image = String(f.get("image"));
+          const rawImage = String(f.get("image") ?? "").trim();
+          const category = String(f.get("category") ?? "");
+          const finalImage = rawImage || CATEGORY_FALLBACK_IMAGES[category] || DEFAULT_FALLBACK_IMAGE;
           const body = {
-            name: f.get("name"), category: f.get("category"), brand: f.get("brand"),
-            description: f.get("description"), includes: [], images: image ? [image] : [],
+            name: f.get("name"), category, brand: f.get("brand"),
+            description: f.get("description"), includes: [], images: [finalImage],
             condition: f.get("condition"),
             phone: String(f.get("phone") ?? "").trim(),
             quantity: num("quantity") || 1,

@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,7 +8,8 @@ import { CalendarDays, MapPin, Package, Phone, ShieldCheck, Star } from "lucide-
 import { toast } from "sonner";
 import { FavoriteToggle } from "@/components/favorite-toggle";
 import { authClient } from "@/lib/auth-client";
-import { api, isImageSrc, money, type Item } from "@/lib/api";
+import { api, money, type Item } from "@/lib/api";
+import { getItemImage, DEFAULT_FALLBACK_IMAGE } from "@/lib/images";
 
 export default function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: resolved } = use(params);
@@ -40,7 +40,8 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
   const requireLogin = () => router.push(`/login?next=${encodeURIComponent(`/items/${resolved}`)}`);
 
   if (isLoading || !item) return <main className="container" style={{ padding: 80, textAlign: "center" }}>{error ? "Item not found" : "Loading item details…"}</main>;
-  const photos = (item.images ?? []).filter(isImageSrc);
+  const mainPhoto = getItemImage(item);
+  const additionalPhotos = (item.images ?? []).filter((s) => s && s !== mainPhoto);
 
   const unavailable = item.bookedDates || [];
   const overlaps = (from: string, to: string) => unavailable.some(d => from <= d.endDate.slice(0, 10) && to >= d.startDate.slice(0, 10));
@@ -52,8 +53,36 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
       <main className="container" style={{ paddingTop: 36, paddingBottom: 70 }}>
         <div className="details">
           <div>
-            <div className="gallery">{photos[0] ? <Image src={photos[0]} alt={item.name} fill sizes="(max-width:800px) 100vw, 65vw" style={{ objectFit: "cover" }} /> : <div style={{ display: "grid", placeItems: "center", height: "100%", color: "#64748b" }}>Listing photos</div>}</div>
-            <div style={{ display: "flex", gap: 12, marginTop: 12 }}>{photos.slice(1).map((src, i) => <div key={src} className="thumb"><Image src={src} alt={`${item.name} view ${i + 2}`} fill sizes="140px" style={{ objectFit: "cover" }} /></div>)}</div>
+            <div className="gallery">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={mainPhoto}
+                alt={item.name}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== DEFAULT_FALLBACK_IMAGE) target.src = DEFAULT_FALLBACK_IMAGE;
+                }}
+              />
+            </div>
+            {additionalPhotos.length > 0 && (
+              <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+                {additionalPhotos.map((src, i) => (
+                  <div key={src} className="thumb">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={`${item.name} view ${i + 2}`}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.src !== DEFAULT_FALLBACK_IMAGE) target.src = DEFAULT_FALLBACK_IMAGE;
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
               <h1 style={{ fontSize: 36, marginBottom: 8 }}>{item.name}</h1>
               <FavoriteToggle item={item} />

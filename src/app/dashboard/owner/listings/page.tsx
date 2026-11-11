@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Package, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, isImageSrc, money, type Item } from "@/lib/api";
+import { api, money, type Item } from "@/lib/api";
+import { getItemImage, DEFAULT_FALLBACK_IMAGE } from "@/lib/images";
 
 const statusChip: Record<string, string> = {
   approved: "chip-green",
@@ -52,12 +53,19 @@ export default function MyListings() {
       ) : data?.length ? (
         <div className="listing-grid">
           {data.map((item) => {
-            const photo = item.images?.find(isImageSrc);
+            const photo = getItemImage(item);
             return (
               <article className="card listing-card" key={item._id}>
                 <div className="listing-photo">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {photo ? <img src={photo} alt={item.name} /> : <Package size={26} color="#94a3b8" />}
+                  <img
+                    src={photo}
+                    alt={item.name}
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== DEFAULT_FALLBACK_IMAGE) target.src = DEFAULT_FALLBACK_IMAGE;
+                    }}
+                  />
                 </div>
                 <div className="listing-body">
                   <div className="listing-top">
