@@ -42,6 +42,7 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
   if (isLoading || !item) return <main className="container" style={{ padding: 80, textAlign: "center" }}>{error ? "Item not found" : "Loading item details…"}</main>;
   const mainPhoto = getItemImage(item);
   const additionalPhotos = (item.images ?? []).filter((s) => s && s !== mainPhoto);
+  const ownerPhone = item.phone || item.owner?.phone;
 
   const unavailable = item.bookedDates || [];
   const overlaps = (from: string, to: string) => unavailable.some(d => from <= d.endDate.slice(0, 10) && to >= d.startDate.slice(0, 10));
@@ -100,14 +101,34 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
                 <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>{item.owner?.isVerified && <><ShieldCheck size={14} color="#6366f1" /> Verified owner</>}</div>
               </div>
             </div>
-            {(item.phone || item.owner?.phone) && (
-              <a className="contact-row" href={`tel:${item.phone || item.owner?.phone}`}>
-                <span className="contact-icon"><Phone size={17} /></span>
-                <span>
-                  <small>Contact the owner</small>
-                  <b>{item.phone || item.owner?.phone}</b>
-                </span>
-              </a>
+            {ownerPhone && (
+              <div style={{ marginTop: 22 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#475569", marginBottom: 8 }}>
+                  Contact owner directly:
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <a className="contact-row" href={`tel:${ownerPhone}`} style={{ flex: 1, minWidth: 200 }}>
+                    <span className="contact-icon"><Phone size={17} /></span>
+                    <span>
+                      <small>Call Owner</small>
+                      <b>{ownerPhone}</b>
+                    </span>
+                  </a>
+                  <a
+                    className="contact-row"
+                    href={`https://wa.me/${ownerPhone.replace(/\D/g, "").replace(/^0/, "880")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ flex: 1, minWidth: 160, background: "linear-gradient(110deg,#ecfdf5,#d1fae5)", color: "#065f46", border: "1px solid #a7f3d0" }}
+                  >
+                    <span className="contact-icon" style={{ color: "#10b981", fontSize: 18 }}>💬</span>
+                    <span>
+                      <small style={{ color: "#059669" }}>Chat on WhatsApp</small>
+                      <b>Message Owner</b>
+                    </span>
+                  </a>
+                </div>
+              </div>
             )}
           </div>
 
@@ -118,6 +139,19 @@ export default function ItemPage({ params }: { params: Promise<{ id: string }> }
             </div>
             <div className="price-rows"><span>Weekly</span><b>{money(item.pricing.weekly)}</b><span>Monthly</span><b>{money(item.pricing.monthly)}</b></div>
             <div className="stock-row"><Package size={15} color="#6366f1" /><span><b>{item.quantity ?? 1}</b> unit{(item.quantity ?? 1) > 1 ? "s" : ""} available</span></div>
+            {ownerPhone && (
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "11px 14px", borderRadius: 12, margin: "14px 0", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#eef2ff", display: "grid", placeItems: "center", color: "#6366f1", flexShrink: 0 }}>
+                  <Phone size={15} />
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  <div style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Owner Phone</div>
+                  <a href={`tel:${ownerPhone}`} style={{ fontWeight: 800, color: "#4338ca", fontSize: 15, textDecoration: "none" }}>
+                    {ownerPhone}
+                  </a>
+                </div>
+              </div>
+            )}
 
             {booked ? (
               <div className="booked-success">

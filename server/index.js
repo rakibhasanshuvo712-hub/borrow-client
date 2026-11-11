@@ -623,7 +623,8 @@ app.get('/api/items/:id', wrap(async (req, res) => {
     Booking.find({ item: item._id, status: { $in: activeStatuses } }, { startDate: 1, endDate: 1 }).lean(),
   ]);
 
-  send(res, { ...item, owner, bookedDates });
+  const phone = item.phone || owner?.phone || '';
+  send(res, { ...item, phone, owner: { ...owner, phone }, bookedDates });
 }));
 
 // READ – item availability for a given month
@@ -747,7 +748,7 @@ app.get('/api/owners/:id', wrap(async (req, res) => {
     authMongoClient
       .db()
       .collection('user')
-      .findOne({ _id: toMongoId(ownerId) }, { projection: { name: 1, image: 1, location: 1, bio: 1, trustScore: 1, isVerified: 1, createdAt: 1 } }),
+      .findOne({ _id: toMongoId(ownerId) }, { projection: { name: 1, image: 1, location: 1, bio: 1, trustScore: 1, isVerified: 1, createdAt: 1, phone: 1 } }),
     Item.find({ owner: ownerId, status: 'approved' }).limit(50).lean(),
     Review.find({ reviewee: ownerId }).sort({ createdAt: -1 }).limit(30).lean(),
   ]);

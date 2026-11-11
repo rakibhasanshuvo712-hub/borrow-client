@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { MapPin, Star } from "lucide-react";
+import { MapPin, Phone, Star } from "lucide-react";
 import { money, type Item } from "@/lib/api";
 import { getItemImage, DEFAULT_FALLBACK_IMAGE } from "@/lib/images";
 
@@ -63,9 +63,16 @@ export function ItemCard({ item }: { item: Item }) {
             {item.avgRating ? item.avgRating.toFixed(1) : "New"}
           </span>
         </div>
-        <div style={{ borderTop: "1px solid #eef0f4", marginTop: 14, paddingTop: 13, fontWeight: 800 }}>
-          {money(item.pricing?.daily || 0)}
-          <span style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>/ day</span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #eef0f4", marginTop: 14, paddingTop: 13 }}>
+          <div style={{ fontWeight: 800 }}>
+            {money(item.pricing?.daily || 0)}
+            <span style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}> / day</span>
+          </div>
+          {item.phone && (
+            <span style={{ fontSize: 11, color: "#4338ca", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4, background: "#eef2ff", padding: "4px 8px", borderRadius: 6 }}>
+              <Phone size={11} /> {item.phone}
+            </span>
+          )}
         </div>
       </div>
     </Link>
